@@ -1,22 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-
+ 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
-
+<TargetFramework>net8.0</TargetFramework>
+<Nullable>enable</Nullable>
+<ImplicitUsings>enable</ImplicitUsings>
+</PropertyGroup>
+ 
   <ItemGroup>
-    <PackageReference Include="Npgsql" Version="8.0.9" />
-    <PackageReference Include="QRCoder" Version="1.6.0" />
-    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
-  </ItemGroup>
-
+<PackageReference Include="Npgsql" Version="8.0.9" />
+<PackageReference Include="QRCoder" Version="1.6.0" />
+<PackageReference Include="System.IO.Ports" Version="8.0.0" />
+</ItemGroup>
+ 
   <ItemGroup>
-    <None Update="Private/dashboard.html">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </None>
-  </ItemGroup>
-
+<None Remove="Private/dashboard.html" />
+<Content Remove="Private/dashboard.html" />
+<Content Include="Private/dashboard.html">
+<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+</Content>
+</ItemGroup>
+ 
 </Project>
