@@ -66,15 +66,15 @@ if (checkSupabase)
         await using (var role = new Npgsql.NpgsqlCommand("SELECT current_user", connection))
         {
             var databaseRole = (string?)await role.ExecuteScalarAsync();
-            if (databaseRole != "roblock_app")
+            if (databaseRole != "postgres.wjbrltkucfbxmcptxmyl")
             {
-                Console.Error.WriteLine("FAIL: Connected, but not as the restricted roblock_app role.");
+                Console.Error.WriteLine("FAIL: Connected, but not as the restricted postgres.wjbrltkucfbxmcptxmyl role.");
                 Environment.ExitCode = 1;
                 return;
             }
         }
         Console.WriteLine("PASS: Supabase login and verified TLS connection.");
-        Console.WriteLine("PASS: Restricted roblock_app role.");
+        Console.WriteLine("PASS: Restricted postgres.wjbrltkucfbxmcptxmyl role.");
         await using var transaction = await connection.BeginTransactionAsync();
         if (!checkWrite)
         {
@@ -95,7 +95,7 @@ if (checkSupabase)
                 "UPDATE roblock.devices SET name = name WHERE id = 'rack-a1'", connection, transaction);
             if (await update.ExecuteNonQueryAsync() != 1)
                 throw new InvalidOperationException("Expected one visible rack-a1 record.");
-            Console.WriteLine("PASS: Device UPDATE executed under roblock_app and RLS.");
+            Console.WriteLine("PASS: Device UPDATE executed under postgres.wjbrltkucfbxmcptxmyl and RLS.");
         }
         await transaction.RollbackAsync();
         Console.WriteLine(checkWrite ? "SUCCESS: Write test rolled back. No records were changed."
@@ -454,7 +454,7 @@ class Db
         using var connection = new NpgsqlConnection(_connectionString);
         connection.Open();
         using (var role = new NpgsqlCommand("SELECT current_user", connection))
-            if (!Equals(role.ExecuteScalar(), "roblock_app"))
+            if (!Equals(role.ExecuteScalar(), "postgres.wjbrltkucfbxmcptxmyl"))
                 throw new InvalidOperationException("Use the restricted RobLock database account.");
         using var tx = connection.BeginTransaction();
         var st = Load(connection, tx);
