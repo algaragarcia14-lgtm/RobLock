@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+.vs/
+.git/
+.env
+.env.*
+appsettings.Development.json
+*.user
+*.suo
+*.pfx
+*.p12
+*.key
+*.crt
+*.cer
+*.pem

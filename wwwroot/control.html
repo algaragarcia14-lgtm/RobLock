@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bike controls - RobLock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/site.css">
+<script src="/js/theme.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    <span>Rob<b>Lock</b></span>
+  </a>
+</header>
+
+<main class="center">
+  <section class="card ctl" aria-live="polite">
+
+    <div id="v-loading">
+      <p class="muted">Connecting to your lock...</p>
+    </div>
+
+    <div id="v-ready" hidden>
+      <p class="device" id="device"></p>
+      <h1 class="state" id="state"></h1>
+      <p class="muted small" id="session-pin" hidden>Keypad PIN (session ID): <strong id="pin-value"></strong></p>
+      <div class="pair">
+        <button type="button" class="btn" id="b-toggle" disabled>Checking status...</button>
+      </div>
+      <p class="note" id="note" role="status"></p>
+      <p class="muted small" id="grace" role="status" hidden></p>
+      <p class="muted small">Unlock within the 15-second grace period to keep your session open. The tamper alarm is paused during grace; movement that stops before grace ends does not trigger a delayed alarm. Unlock after it ends to complete your session.</p>
+
+      <form id="info" class="info" novalidate>
+        <h2>Your details</h2>
+        <p class="muted small">The admin can see these while your session is open.</p>
+        <div class="field">
+          <label for="i-name">Name</label>
+          <input id="i-name" type="text" autocomplete="name" maxlength="80">
+        </div>
+        <div class="field">
+          <label for="i-age">Age</label>
+          <input id="i-age" type="number" inputmode="numeric" min="1" max="120" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="i-phone">Phone number</label>
+          <input id="i-phone" type="tel" autocomplete="tel" maxlength="24">
+        </div>
+        <div class="field">
+          <label for="i-address">Address</label>
+          <input id="i-address" type="text" autocomplete="street-address" maxlength="200">
+        </div>
+        <p class="info-msg" id="info-msg" role="status"></p>
+        <button type="submit" class="btn ghost" id="info-save">Save details</button>
+      </form>
+    </div>
+
+    <div id="v-gone" hidden>
+      <h1 id="gone-title">This session has ended</h1>
+      <p class="muted" id="gone-text">Scan a new QR code to get back in.</p>
+      <a class="btn" href="/">Scan a QR code</a>
+    </div>
+
+  </section>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var id = (new URLSearchParams(location.search).get("s") || "").trim();
+  var busy = false, savingInfo = false, timer = null;
+  var currentLocked = null, ended = false, polling = false, revision = 0;
+  var graceDeadline = 0, graceTimer = null;
+
+  function graceLeft() { return Math.max(0, graceDeadline - performance.now()); }
+  function renderGrace() {
+    var el = $("grace");
+    var left = Math.ceil(graceLeft() / 1000);
+    el.hidden = ended || currentLocked !== true;
+    var message = left > 0 ? "Grace period: " + left + "s — unlock to keep this session open." : "Grace period ended. Unlocking completes your session.";
+    if (!el.hidden && el.textContent !== message) el.textContent = message;
+  }
+
+  function updateButton() {
+    var b = $("b-toggle");
+    b.disabled = busy || savingInfo || ended || currentLocked === null;
+    b.textContent = busy ? "Please wait..." : currentLocked === null ? "Status unavailable" : currentLocked ? "Unlock" : "Lock";
+  }
+
+  function unknown(text) {
+    currentLocked = null;
+    renderGrace();
+    $("state").textContent = text;
+    updateButton();
+  }
+
+  function show(which) {
+    $("v-loading").hidden = which !== "loading";
+    $("v-ready").hidden = which !== "ready";
+    $("v-gone").hidden = which !== "gone";
+  }
+
+  function gone(title, text) {
+    ended = true;
+    $("pin-value").textContent = "";
+    $("session-pin").hidden = true;
+    revision++;
+    clearInterval(timer);
+    clearInterval(graceTimer);
+    renderGrace();
+    updateButton();
+    $("gone-title").textContent = title;
+    $("gone-text").textContent = text;
+    show("gone");
+  }
+
+  function paint(v) {
+    if (ended) return;
+    $("device").textContent = v.deviceName;
+    $("session-pin").hidden = !v.physical;
+    $("pin-value").textContent = v.physical && /^\d{5}$/.test(v.id) ? v.id : "";
+    if (typeof v.locked !== "boolean" || v.stateKnown === false || (v.physical && v.stateKnown !== true)) {
+      unknown(v.physical ? "Arduino state unknown" : "Lock state unknown");
+      return;
+    }
+    currentLocked = v.locked;
+    graceDeadline = performance.now() + (v.locked && Number.isFinite(v.graceRemainingMs) ? Math.max(0, Math.min(15000, v.graceRemainingMs)) : 0);
+    renderGrace();
+    $("state").textContent = v.physical ? (v.locked ? "Lock commanded (not verified)" : "Unlock commanded (not verified)") : (v.locked ? "Locked" : "Unlocked");
+    updateButton();
+  }
+
+  function call(path, method, body) {
+    var opts = { method: method };
+    if (body) {
+      opts.headers = { "Content-Type": "application/json" };
+      opts.body = JSON.stringify(body);
+    }
+    return fetch("/api/session/" + encodeURIComponent(id) + path, opts)
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          return { ok: r.ok, status: r.status, data: d };
+        });
+      });
+  }
+
+  function poll() {
+    if (busy || ended || polling) return;
+    polling = true;
+    var requestRevision = revision;
+    return call("", "GET").then(function (r) {
+      if (ended || requestRevision !== revision) return;
+      if (r.status === 404) gone("This session has ended", "Scan a new QR code to get back in.");
+      else if (r.ok) paint(r.data);
+      else unknown("Arduino status unavailable");
+    }).catch(function () {
+      if (!ended && requestRevision === revision) unknown("Connection unavailable");
+    }).then(function () {
+      polling = false;
+    });
+  }
+
+  function act() {
+    if (busy || savingInfo || ended || currentLocked === null) return;
+    var action = currentLocked ? "unlock" : "lock";
+    busy = true;
+    revision++;
+    updateButton();
+    $("note").textContent = action === "unlock" ? "Unlocking..." : "Locking...";
+    var failed = false;
+    call("/" + action, "POST").then(function (r) {
+      if (ended) return;
+      if (r.ok && r.data.status === "ended") {
+        gone("Session completed", "Your session has ended. Scan a new QR code to use a rack again.");
+      } else if (r.ok) {
+        paint(r.data);
+        $("note").textContent = action === "unlock" ? "Unlocked. Your session is still active." : "Lock command completed.";
+      }
+      else if (r.status === 404) gone("This session has ended", "Scan a new QR code to get back in.");
+      else {
+        failed = true;
+        unknown("Lock state unconfirmed");
+        $("note").textContent = r.data.error || "That didn't work. Try again.";
+      }
+    }).catch(function () {
+      if (ended) return;
+      failed = true;
+      unknown("Connection unavailable");
+      $("note").textContent = "Could not reach the lock. Try again.";
+    }).then(function () {
+      busy = false;
+      updateButton();
+      if (failed) poll();
+    });
+  }
+
+  // ---- user details form ----
+
+  var infoLoaded = false;
+
+  function fillInfo(u) {
+    // prefill once, so polling never overwrites what the person is typing
+    if (infoLoaded || !u) return;
+    infoLoaded = true;
+    $("i-name").value = u.name || "";
+    $("i-age").value = u.age || "";
+    $("i-phone").value = u.phone || "";
+    $("i-address").value = u.address || "";
+  }
+
+  function setInfoMsg(text, ok) {
+    var m = $("info-msg");
+    m.textContent = text;
+    m.className = "info-msg" + (ok ? " ok" : "");
+  }
+
+  $("info").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (busy || savingInfo || ended) return;
+    var name = $("i-name").value.trim();
+    var ageText = $("i-age").value.trim();
+    var phone = $("i-phone").value.trim();
+    var address = $("i-address").value.trim();
+    var age = parseInt(ageText, 10);
+
+    if (name.length < 2) { setInfoMsg("Enter your name."); return; }
+    if (!/^\d{1,3}$/.test(ageText) || age < 1 || age > 120) { setInfoMsg("Enter an age between 1 and 120."); return; }
+    if (phone.replace(/\D/g, "").length < 7) { setInfoMsg("Enter a phone number with at least 7 digits."); return; }
+    if (address.length < 5) { setInfoMsg("Enter your address."); return; }
+
+    savingInfo = true;
+    updateButton();
+    $("info-save").disabled = true;
+    setInfoMsg("");
+    call("/info", "POST", { name: name, age: age, address: address, phone: phone }).then(function (r) {
+      if (r.ok) { infoLoaded = true; setInfoMsg("Saved.", true); }
+      else if (r.status === 404) gone("This session has ended", "Scan a new QR code to get back in.");
+      else if (r.status === 429) setInfoMsg("Too many tries. Wait a minute.");
+      else setInfoMsg(r.data.error || "Could not save. Try again.");
+    }).catch(function () {
+      setInfoMsg("Could not reach the server. Try again.");
+    }).then(function () { savingInfo = false; $("info-save").disabled = false; updateButton(); });
+  });
+
+  $("b-toggle").addEventListener("click", act);
+
+  if (!/^\d{5}$/.test(id)) {
+    gone("This link isn't valid", "Scan the QR code from the admin again.");
+    return;
+  }
+
+  call("/join", "POST").then(function (r) {
+    if (r.ok) {
+      if (r.data.physical) {
+        // The join endpoint may return a cached state. Check the Arduino first.
+        $("device").textContent = r.data.deviceName;
+        unknown("Checking Arduino status...");
+        $("b-toggle").textContent = "Checking status...";
+      } else paint(r.data);
+      fillInfo(r.data.user);
+      show("ready");
+      timer = setInterval(poll, 4000);
+      graceTimer = setInterval(renderGrace, 200);
+      if (r.data.physical) poll();
+    } else if (r.status === 429) {
+      gone("Too many tries", "Wait a minute, then scan again.");
+    } else {
+      gone("This session has ended", "Scan a new QR code to get back in.");
+    }
+  }).catch(function () {
+    gone("Could not connect", "Check your connection and open the link again.");
+  });
+})();
+</script>
+</body>
+</html>

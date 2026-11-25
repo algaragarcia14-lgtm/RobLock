@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard - RobLock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/site.css">
+<script src="/js/theme.js"></script>
+<style>
+  .dash {
+    padding: 28px 32px 48px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    align-items: start;
+  }
+  .panel {
+    padding: 24px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .panel h2 { margin: 0 0 18px; font-size: 22px; font-weight: 700; }
+  .panel h3 { margin: 22px 0 8px; font-size: 14px; font-weight: 700; color: var(--muted); }
+  .panel h3:first-of-type { margin-top: 0; }
+  .history-open { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .history-open small { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .history-open:hover small { text-decoration: underline; }
+  .history-dialog { width: min(820px, calc(100% - 32px)); max-height: 88vh; max-height: 88dvh; overflow: auto; background: var(--bg2); color: var(--ink); font-family: inherit; }
+  .history-dialog::backdrop { background: rgba(0, 0, 0, .65); }
+  .history-dialog-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .history-dialog-top h2 { margin: 0; }
+  .history-dialog .list { max-height: none; overflow: visible; }
+  .history-dialog .list li { flex-wrap: wrap; }
+  .history-dialog .list .grow { overflow-wrap: anywhere; }
+  .history-dialog .list time { white-space: normal; }
+  .history-session-row { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; background: var(--chip); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 14px; font: inherit; cursor: pointer; }
+  .history-session-row:hover, .history-session-row:focus-visible { border-color: var(--accent); }
+  .history-session-row .grow { flex: 1; min-width: 0; }
+  .history-session-row .view-label { color: var(--accent); font-size: 12px; font-weight: 700; }
+  .history-session-list li { border: 0; padding: 5px 0; }
+  .history-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0 0 24px; }
+  .history-detail-grid > div { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--chip); min-width: 0; }
+  .history-detail-grid dt { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .history-detail-grid dd { margin: 0; overflow-wrap: anywhere; font-size: 14px; }
+  .history-detail-grid .wide { grid-column: 1 / -1; }
+  .history-notice { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+  @media (max-width: 500px) { .history-detail-grid { grid-template-columns: 1fr; } .history-session-row { flex-wrap: wrap; } }
+  .list .grow { overflow-wrap: anywhere; }
+
+  .list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
+  .list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+  }
+  .list li:first-child { border-top: none; }
+  .list .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .list small { font-size: 12px; color: var(--muted); }
+  .list .sid { font-size: 17px; font-weight: 700; }
+  .list time { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .empty { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .gen-row { display: flex; flex-direction: column; gap: 14px; }
+  .gen-msg { min-height: 20px; margin: 10px 0 0; font-size: 14px; color: var(--warn); }
+  #gen-result { margin-top: 12px; text-align: center; }
+  .bigid { margin: 6px 0 12px; font-size: 44px; font-weight: 700; letter-spacing: 0.12em; }
+  .qr { display: block; margin: 0 auto 12px; background: #fff; padding: 8px; border-radius: 12px; }
+  .url { margin: 0 0 12px; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .hint { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); text-align: left; }
+
+  .dev { padding: 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--chip); margin-bottom: 14px; }
+  .dev:last-child { margin-bottom: 0; }
+  .dev-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .dev-top h3 { margin: 0; font-size: 17px; color: var(--ink); }
+  .dev-top .chips { display: flex; gap: 6px; }
+  .dev .sess { margin: 8px 0 12px; font-size: 14px; color: var(--muted); }
+  .dev .sess b { color: var(--ink); }
+  .dev .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .dev .btn.small { height: 40px; padding: 0 14px; font-size: 14px; }
+  .dev .qr { width: 140px; height: 140px; margin: 0 0 10px; }
+
+  @media (max-width: 1100px) {
+    .dash { grid-template-columns: 1fr; padding: 20px 16px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    <span>Rob<b>Lock</b></span>
+  </a>
+  <nav class="nav">
+    <button type="button" class="navbtn" onclick="RobTheme.toggle()" aria-label="Switch between night and day theme">
+      <svg class="i-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="i-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <span class="lbl-night">NIGHT</span><span class="lbl-day">DAY</span>
+    </button>
+    <button type="button" class="navbtn" id="logout" title="Log out">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      <span id="who"></span> LOG OUT
+    </button>
+  </nav>
+</header>
+
+<main class="dash">
+
+  <section class="panel" aria-labelledby="h-history">
+    <h2 id="h-history"><button type="button" class="history-open" id="history-open" aria-haspopup="dialog" aria-controls="history-dialog">History <small>View full history</small></button></h2>
+    <div id="history-inline">
+      <div id="history-content">
+        <h3>Sessions</h3>
+        <ul class="list" id="sessions"><li><p class="empty">Loading sessions...</p></li></ul>
+        <h3>Events</h3>
+        <ul class="list" id="events"><li><p class="empty">Loading events...</p></li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-gen">
+    <h2 id="h-gen">Generate new session</h2>
+    <div class="gen-row">
+      <div>
+        <label for="device-select">Device</label>
+        <select id="device-select"></select>
+      </div>
+      <button type="button" class="btn small" id="gen-btn">Generate session</button>
+    </div>
+    <p class="gen-msg" id="gen-msg" role="alert"></p>
+    <div id="gen-result"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-dev">
+    <h2 id="h-dev">Devices</h2>
+    <div id="devices"></div>
+  </section>
+
+</main>
+
+<dialog class="panel history-dialog" id="history-dialog" aria-labelledby="history-title">
+  <div class="history-dialog-top">
+    <h2 id="history-title">History</h2>
+    <button type="button" class="btn small ghost" id="history-close" autofocus>Close</button>
+  </div>
+  <p class="history-notice" id="history-notice" role="status">Loading saved sessions...</p>
+  <ul class="list history-session-list" id="history-all-sessions"></ul>
+</dialog>
+
+<dialog class="panel history-dialog" id="session-dialog" aria-labelledby="session-title">
+  <div class="history-dialog-top">
+    <h2 id="session-title">Session details</h2>
+    <button type="button" class="btn small ghost" id="session-back" autofocus>Back to history</button>
+  </div>
+  <p class="history-notice" id="session-notice" role="status"></p>
+  <div id="session-details"></div>
+  <h3>Security events</h3>
+  <ul class="list" id="session-events"></ul>
+</dialog>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var data = null, lastJson = "", shown = {}, created = null, selected = "";
+  var ackPending = Object.create(null), endPending = Object.create(null);
+  var onLocalhost = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function when(iso) {
+    if (!iso) return "";
+    return new Date(iso).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+  }
+
+  function api(path, opts) {
+    return fetch(path, opts).then(function (r) {
+      if (r.status === 401) { location.href = "/admin.html"; throw new Error("not logged in"); }
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        return { ok: r.ok, status: r.status, data: d };
+      });
+    });
+  }
+
+  function load() {
+    return api("/api/admin/dashboard").then(function (r) {
+      if (!r.ok) return;
+      var json = JSON.stringify(r.data);
+      if (json === lastJson) return;
+      lastJson = json;
+      data = r.data;
+      render();
+    }).catch(function () { /* offline or logged out: try again on the next tick */ });
+  }
+
+  function refresh() { lastJson = ""; return load(); }
+
+  // show who is signed in, inside the log out button
+  fetch("/api/admin/me").then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.username) $("who").textContent = d.username + " |";
+  }).catch(function () {});
+
+  // ---- History: sessions (time in / time out) and events ----
+
+  var historyDialog = $("history-dialog");
+  var sessionDialog = $("session-dialog");
+  var historyRecords = [], historyLoading = false, historyLoaded = false;
+  var selectedHistoryKey = null;
+
+  function sessionKey(s) { return JSON.stringify([s.id, s.deviceId, s.createdAt]); }
+
+  $("history-open").addEventListener("click", function () {
+    if (historyDialog.open) return;
+    historyRecords = [];
+    historyLoaded = false;
+    updateHistoryList("history-all-sessions", "");
+    $("history-notice").textContent = "Loading saved sessions...";
+    historyDialog.showModal();
+    loadSessionHistory();
+  });
+  $("history-close").addEventListener("click", function () { historyDialog.close(); });
+  historyDialog.addEventListener("close", function () {
+    if (sessionDialog.open) sessionDialog.close();
+    selectedHistoryKey = null;
+    historyRecords = [];
+    historyLoaded = false;
+    $("history-open").focus();
+  });
+  $("session-back").addEventListener("click", function () { sessionDialog.close(); });
+  sessionDialog.addEventListener("close", function () {
+    var key = selectedHistoryKey;
+    selectedHistoryKey = null;
+    if (!historyDialog.open) return;
+    var rows = $("history-all-sessions").querySelectorAll("button[data-history-key]");
+    var row = Array.from(rows).find(function (b) { return b.getAttribute("data-history-key") === key; });
+    (row || $("history-close")).focus();
+  });
+  $("history-all-sessions").addEventListener("click", function (e) {
+    var button = e.target.closest("button[data-history-key]");
+    if (!button || sessionDialog.open) return;
+    selectedHistoryKey = button.getAttribute("data-history-key");
+    $("session-notice").textContent = "";
+    renderSelectedHistory();
+    sessionDialog.showModal();
+    sessionDialog.scrollTop = 0;
+  });
+
+  function loadSessionHistory() {
+    if (!historyDialog.open || historyLoading) return;
+    historyLoading = true;
+    return api("/api/admin/history").then(function (r) {
+      if (!r.ok || !Array.isArray(r.data)) throw new Error("History unavailable");
+      if (!historyDialog.open) return;
+      historyRecords = r.data;
+      historyLoaded = true;
+      renderSessionHistory();
+      $("session-notice").textContent = "";
+    }).catch(function () {
+      if (!historyDialog.open) return;
+      var message = historyLoaded ? "Could not refresh history. Showing last loaded records." : "Could not load history. Retrying automatically; check that the updated server is running.";
+      $("history-notice").textContent = message;
+      $("session-notice").textContent = message;
+    }).finally(function () { historyLoading = false; });
+  }
+
+  function renderSessionHistory() {
+    $("history-notice").textContent = historyRecords.length + " saved session" + (historyRecords.length === 1 ? "" : "s") + ". Select a session to view its details and events.";
+    var html = historyRecords.map(function (record) {
+      var s = record.session;
+      return '<li><button type="button" class="history-session-row" data-history-key="' + esc(sessionKey(s)) + '" aria-haspopup="dialog">' +
+        '<span class="mono sid">' + esc(s.id) + '</span><span class="grow"><b>' + esc(s.deviceName) + '</b>' +
+        '<small>' + esc(when(s.createdAt)) + '</small><small>' + (s.user ? esc(s.user.name) : 'No user details yet') + '</small></span>' +
+        statusChip(s) + '<span class="view-label">View details ›</span></button></li>';
+    }).join("");
+    updateHistoryList("history-all-sessions", html || '<li><p class="empty">No sessions yet.</p></li>');
+    if (selectedHistoryKey !== null) renderSelectedHistory();
+  }
+
+  function detailField(label, value, wide) {
+    return '<div' + (wide ? ' class="wide"' : '') + '><dt>' + esc(label) + '</dt><dd>' + esc(value == null || value === "" ? "Not provided" : value) + '</dd></div>';
+  }
+
+  function renderSelectedHistory() {
+    var record = historyRecords.find(function (r) { return sessionKey(r.session) === selectedHistoryKey; });
+    if (!record) {
+      $("session-title").textContent = "Session details";
+      updateHistoryList("session-details", '<p class="empty">This session is no longer in the saved history.</p>');
+      updateHistoryList("session-events", "");
+      return;
+    }
+    var s = record.session, u = s.user;
+    $("session-title").textContent = "Session " + s.id;
+    var details = '<h3>Session information</h3><dl class="history-detail-grid">' +
+      detailField("Rack", s.deviceName) + detailField("Status", s.status === "ended" && s.endReason === "expired" ? "Expired" : s.status.charAt(0).toUpperCase() + s.status.slice(1)) +
+      detailField("Date and time created", when(s.createdAt)) + detailField("Time in", s.timeIn ? when(s.timeIn) : "Not yet recorded") +
+      detailField("Time out", s.timeOut ? when(s.timeOut) : "Not yet recorded") + detailField("End reason", s.endReason || "Not applicable") + '</dl>' +
+      '<h3>User information</h3>' + (u ? '<dl class="history-detail-grid">' + detailField("Full name", u.name) + detailField("Age", u.age) +
+      detailField("Phone number", u.phone) + detailField("Address", u.address, true) + '</dl>' : '<p class="empty">No user details were submitted for this session.</p>');
+    updateHistoryList("session-details", details);
+    updateHistoryList("session-events", eventRows(record.events, "No saved security events for this session."));
+  }
+
+  function statusChip(s) {
+    if (s.status === "active") return '<span class="chip ok">Active</span>';
+    if (s.status === "waiting") return '<span class="chip">Waiting</span>';
+    return '<span class="chip warn">' + (s.endReason === "expired" ? "Expired" : "Ended") + "</span>";
+  }
+
+  // the user's typed details, escaped, one line each
+  function userLines(u) {
+    if (!u) return "<small>User: no details yet</small>";
+    return "<small>User: " + esc(u.name) + ", age " + esc(u.age) + "</small>" +
+      "<small>Phone: " + esc(u.phone) + "</small>" +
+      "<small>Address: " + esc(u.address) + "</small>";
+  }
+
+  function renderHistory() {
+    var sessionsHtml = data.sessions.length
+      ? data.sessions.map(function (s) {
+          return '<li><span class="mono sid">' + esc(s.id) + '</span>' +
+            '<span class="grow"><b>' + esc(s.deviceName) + '</b>' +
+            "<small>Created: " + esc(when(s.createdAt)) + "</small>" +
+            "<small>Time in: " + (s.timeIn ? esc(when(s.timeIn)) : "not yet") + "</small>" +
+            "<small>Time out: " + (s.timeOut ? esc(when(s.timeOut)) : "still open") + "</small>" +
+            userLines(s.user) + "</span>" +
+            statusChip(s) + "</li>";
+        }).join("")
+      : '<li><p class="empty">No sessions yet.</p></li>';
+
+    var eventsHtml = eventRows(data.events, "No events yet.");
+    // Leave the existing DOM and scroll position alone when only device status changes.
+    updateHistoryList("sessions", sessionsHtml);
+    updateHistoryList("events", eventsHtml);
+  }
+
+  function eventRows(events, emptyMessage) {
+    return events.length
+      ? events.map(function (e) {
+          var detail = [e.detail, e.deviceName, e.sessionId ? "Session " + e.sessionId : ""]
+            .filter(Boolean).join(", ");
+          var cls = e.kind === "ok" ? "ok" : e.kind === "warn" ? "warn" : "";
+          return '<li><span class="grow"><b>' + esc(e.title) + "</b><small>" + esc(detail) + "</small></span>" +
+            (cls ? '<span class="chip ' + cls + '">' + (cls === "ok" ? "OK" : "Alert") + "</span>" : "") +
+            '<time datetime="' + esc(e.time) + '">' + esc(when(e.time)) + "</time></li>";
+        }).join("")
+      : '<li><p class="empty">' + esc(emptyMessage) + '</p></li>';
+  }
+
+  var historyMarkup = {};
+  function updateHistoryList(id, html) {
+    if (historyMarkup[id] === html) return;
+    var list = $(id), top = list.scrollTop;
+    var focused = list.contains(document.activeElement) && document.activeElement.getAttribute("data-history-key");
+    list.innerHTML = html;
+    if (focused) {
+      var replacement = Array.from(list.querySelectorAll("button[data-history-key]")).find(function (b) { return b.getAttribute("data-history-key") === focused; });
+      if (replacement) replacement.focus({ preventScroll: true });
+    }
+    list.scrollTop = top;
+    historyMarkup[id] = html;
+  }
+
+  // ---- Generate new session ----
+
+  function renderSelect() {
+    var sel = $("device-select");
+    var keep = sel.value || selected;
+    sel.innerHTML = '<option value="">Select a device</option>' + data.devices.map(function (d) {
+      var inUse = !!d.activeSession;
+      return '<option value="' + esc(d.id) + '"' + (inUse ? " disabled" : "") + ">" +
+        esc(d.name) + (inUse ? " (in use)" : "") + "</option>";
+    }).join("");
+    var stillFree = data.devices.some(function (d) { return d.id === keep && !d.activeSession; });
+    if (keep && stillFree) sel.value = keep;
+    selected = sel.value;
+  }
+
+  function renderGenerated() {
+    var box = $("gen-result");
+    if (!created) {
+      box.innerHTML = '<p class="empty">Pick a device and generate a session to get its QR code.</p>';
+      return;
+    }
+    var live = data.sessions.filter(function (s) { return s.id === created.id && s.status !== "ended"; })[0];
+    if (!live) {
+      box.innerHTML = '<p class="empty">Session <b class="mono">' + esc(created.id) + "</b> has ended. Generate a new one.</p>";
+      return;
+    }
+    var url = location.origin + "/control.html?s=" + live.id;
+    box.innerHTML =
+      '<p class="muted">' + esc(live.deviceName) + "</p>" +
+      '<p class="bigid mono">' + esc(live.id) + "</p>" +
+      '<img class="qr" width="200" height="200" src="/api/admin/sessions/' + esc(live.id) + '/qr.svg" alt="QR code for session ' + esc(live.id) + '">' +
+      '<p class="url">' + esc(url) + "</p>" +
+      '<button type="button" class="btn small ghost" id="copy-btn" data-url="' + esc(url) + '">Copy link</button>' +
+      (onLocalhost
+        ? '<p class="hint">This page is open on localhost, so phones can\'t open this QR code. Open the dashboard using this PC\'s network address instead (for example http://192.168.1.20:5000).</p>'
+        : "");
+  }
+
+  $("device-select").addEventListener("change", function () { selected = this.value; });
+
+  $("gen-btn").addEventListener("click", function () {
+    var deviceId = $("device-select").value;
+    var msg = $("gen-msg");
+    msg.textContent = "";
+    if (!deviceId) { msg.textContent = "Select a device first."; return; }
+    api("/api/admin/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: deviceId })
+    }).then(function (r) {
+      if (!r.ok) { msg.textContent = r.data.error || "Could not create the session."; return; }
+      created = r.data;
+      refresh();
+    }).catch(function () { /* handled by api() */ });
+  });
+
+  $("gen-result").addEventListener("click", function (e) {
+    var b = e.target.closest("#copy-btn");
+    if (!b) return;
+    var url = b.getAttribute("data-url");
+    var done = function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy link"; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done, function () { b.textContent = "Copy failed"; });
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = url; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (err) { b.textContent = "Copy failed"; }
+      document.body.removeChild(ta);
+    }
+  });
+
+  // ---- Devices: active QR, lock / unlock, buzzer ----
+
+  function buzzerChip(d) {
+    if (!d.physical) return d.buzzer ? '<span class="chip warn">Buzzer on</span>' : '';
+    if (!d.buzzerKnown) return '<span class="chip warn">Buzzer status unavailable</span>';
+    if (d.buzzerMode === "ALARM") return '<span class="chip warn">Tamper alarm active</span>';
+    if (d.armState === "SILENCED") return '<span class="chip warn">Rearming (2s)</span>';
+    if (d.buzzerMode === "TEST") return '<span class="chip warn">Buzzer test on</span>';
+    if (d.armState === "GRACE") return '<span class="chip warn">Grace period (alarm paused)</span>';
+    return '<span class="chip">Buzzer ' + (d.buzzer ? 'on' : 'off') + '</span>';
+  }
+
+  function buzzerButton(d) {
+    var alarm = d.physical && d.buzzerMode === "ALARM" && d.armState === "ALARM";
+    var rearming = d.physical && d.armState === "SILENCED";
+    var active = d.physical ? d.buzzerMode === "TEST" : d.buzzer;
+    var pending = !!ackPending[d.id];
+    var disabled = d.physical && (pending || !d.buzzerKnown || rearming || d.armState === "ARMING" ||
+      (alarm && (!d.stateKnown || !d.locked)) || (d.buzzerMode === "ALARM" && !alarm));
+    var label = pending ? "Acknowledging..." : rearming ? "Rearming..." : alarm ? "Acknowledge alarm" : active ? "Stop buzzer" : d.physical ? "Test buzzer" : "Buzzer";
+    var action = alarm ? "ack-alarm" : active ? "buzzer-off" : "buzzer-on";
+    return '<button type="button" class="btn small ghost" data-dev="' + esc(d.id) + '" data-act="' + action + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>';
+  }
+
+  function renderDevices() {
+    $("devices").innerHTML = data.devices.map(function (d) {
+      var s = d.activeSession;
+      var open = s && shown[s.id];
+      return '<article class="dev">' +
+        '<div class="dev-top"><h3>' + esc(d.name) + "</h3>" +
+        '<span class="chips"><span class="chip ' + (d.locked ? "ok" : "warn") + '">' + (d.physical ? (d.stateKnown ? (d.locked ? "Lock commanded" : "Unlock commanded") : "State unknown") : (d.locked ? "Locked" : "Unlocked")) + "</span>" +
+        (d.physical ? '<span class="chip">No position feedback</span>' : "") + buzzerChip(d) + "</span></div>" +
+        '<p class="sess">' + (s ? "Session <b class=\"mono\">" + esc(s.id) + "</b> (" + esc(s.status) + ")" : "No active session") + "</p>" +
+        (s && d.stateKnown && d.locked && s.graceRemainingMs > 0 ? '<p class="sess">Grace period: ' + Math.ceil(s.graceRemainingMs / 1000) + 's remaining</p>' : "") +
+        (s && s.user ? '<p class="sess">User: <b>' + esc(s.user.name) + "</b>, " + esc(s.user.phone) + "</p>" : "") +
+        (open ? '<img class="qr" src="/api/admin/sessions/' + esc(s.id) + '/qr.svg" alt="QR code for session ' + esc(s.id) + '">' : "") +
+        '<div class="btns">' +
+          '<button type="button" class="btn small ghost" data-dev="' + esc(d.id) + '" data-act="lock">Lock</button>' +
+          '<button type="button" class="btn small ghost" data-dev="' + esc(d.id) + '" data-act="unlock">Unlock</button>' +
+          buzzerButton(d) +
+        "</div>" +
+        (s
+          ? '<div class="btns">' +
+              '<button type="button" class="btn small" data-qr="' + esc(s.id) + '">' + (open ? "Hide QR" : "Show QR") + "</button>" +
+              '<button type="button" class="btn small ghost" data-end="' + esc(s.id) + '"' + (endPending[s.id] ? ' disabled>Ending...' : '>End session') + '</button>' +
+            "</div>"
+          : "") +
+        "</article>";
+    }).join("");
+  }
+
+  $("devices").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    if (b.hasAttribute("data-act")) {
+      var devId = b.getAttribute("data-dev");
+      var act = b.getAttribute("data-act");
+      if (act === "ack-alarm") {
+        if (ackPending[devId]) return;
+        ackPending[devId] = true;
+        renderDevices();
+        api("/api/admin/devices/" + encodeURIComponent(devId) + "/ack-alarm", { method: "POST" })
+          .then(function (r) {
+            if (!r.ok) alert(r.data.error || "Alarm acknowledgment not confirmed.");
+            return refresh();
+          })
+          .catch(function (err) { alert(err && err.message ? err.message : "Alarm acknowledgment not confirmed."); })
+          .finally(function () { delete ackPending[devId]; if (data) renderDevices(); });
+        return;
+      }
+      api("/api/admin/devices/" + encodeURIComponent(devId) + "/" + act, { method: "POST" })
+        .then(function (r) { if (!r.ok) { alert(r.data.error || "Command not confirmed."); return refresh(); } return refresh(); })
+        .catch(function (err) { alert(err && err.message ? err.message : "Could not reach the server."); });
+    } else if (b.hasAttribute("data-qr")) {
+      var sid = b.getAttribute("data-qr");
+      shown[sid] = !shown[sid];
+      renderDevices();
+    } else if (b.hasAttribute("data-end")) {
+      var sid = b.getAttribute("data-end");
+      if (endPending[sid]) return;
+      endPending[sid] = true;
+      renderDevices();
+      api("/api/admin/sessions/" + encodeURIComponent(sid) + "/end", { method: "POST" })
+        .then(function (r) {
+          if (!r.ok) alert(r.data.error || "Session end was not confirmed. Check the rack and try again.");
+          return refresh();
+        })
+        .catch(function (err) { alert(err && err.message ? err.message : "Session end was not confirmed. Check the rack and try again."); })
+        .finally(function () { delete endPending[sid]; if (data) renderDevices(); });
+    }
+  });
+
+  function render() {
+    renderHistory();
+    renderSelect();
+    renderGenerated();
+    renderDevices();
+  }
+
+  $("logout").addEventListener("click", function () {
+    api("/api/admin/logout", { method: "POST" }).then(function () { location.href = "/admin.html"; }).catch(function () {});
+  });
+
+  load();
+  setInterval(function () { if (!document.hidden) { load(); loadSessionHistory(); } }, 3000);
+})();
+</script>
+</body>
+</html>

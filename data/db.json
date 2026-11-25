@@ -1,0 +1,287 @@
+{
+  "Devices": [
+    {
+      "Id": "rack-a1",
+      "Name": "Rack A1",
+      "Locked": false,
+      "Buzzer": false,
+      "BuzzerKnown": true,
+      "BuzzerMode": "IDLE",
+      "ArmState": "DISARMED",
+      "ReportedGraceMs": 0,
+      "StateKnown": false
+    },
+    {
+      "Id": "rack-a2",
+      "Name": "Rack A2",
+      "Locked": true,
+      "Buzzer": false,
+      "BuzzerKnown": false,
+      "BuzzerMode": null,
+      "ArmState": null,
+      "ReportedGraceMs": null,
+      "StateKnown": true
+    },
+    {
+      "Id": "rack-b1",
+      "Name": "Rack B1",
+      "Locked": true,
+      "Buzzer": false,
+      "BuzzerKnown": false,
+      "BuzzerMode": null,
+      "ArmState": null,
+      "ReportedGraceMs": null,
+      "StateKnown": true
+    },
+    {
+      "Id": "rack-b2",
+      "Name": "Rack B2",
+      "Locked": true,
+      "Buzzer": false,
+      "BuzzerKnown": false,
+      "BuzzerMode": null,
+      "ArmState": null,
+      "ReportedGraceMs": null,
+      "StateKnown": true
+    }
+  ],
+  "Sessions": [
+    {
+      "Id": "10326",
+      "DeviceId": "rack-a1",
+      "CreatedAt": "2026-11-25T13:05:34.6799106Z",
+      "ExpiresAt": "2026-11-25T15:05:34.6799106Z",
+      "ClaimedAt": null,
+      "EndedAt": "2026-11-25T13:07:04.0291922Z",
+      "GraceUntil": null,
+      "EndReason": "ended by admin",
+      "User": null
+    }
+  ],
+  "UsedSessionIds": [
+    "10326"
+  ],
+  "Events": [
+    {
+      "Time": "2026-11-25T13:05:34.7066914Z",
+      "Kind": "info",
+      "Title": "Session created",
+      "Detail": "QR code generated",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:05:39.8373325Z",
+      "Kind": "ok",
+      "Title": "Locked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:05:39.8403219Z",
+      "Kind": "info",
+      "Title": "Grace period started",
+      "Detail": "15-second session-retention window after confirmed lock",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:06:01.1198968Z",
+      "Kind": "ok",
+      "Title": "Tamper alarm acknowledged",
+      "Detail": "By admin; Arduino confirmed; automatic 2-second rearm",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:06:09.6188377Z",
+      "Kind": "ok",
+      "Title": "Unlocked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:06:13.2335272Z",
+      "Kind": "ok",
+      "Title": "Locked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:06:13.2335336Z",
+      "Kind": "info",
+      "Title": "Grace period started",
+      "Detail": "15-second session-retention window after confirmed lock",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:06:38.2184518Z",
+      "Kind": "ok",
+      "Title": "Tamper alarm acknowledged",
+      "Detail": "By admin; Arduino confirmed; automatic 2-second rearm",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:06:53.1503695Z",
+      "Kind": "ok",
+      "Title": "Tamper alarm acknowledged",
+      "Detail": "By admin; Arduino confirmed; automatic 2-second rearm",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:06:57.7710196Z",
+      "Kind": "ok",
+      "Title": "Tamper alarm acknowledged",
+      "Detail": "By admin; Arduino confirmed; automatic 2-second rearm",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:07:04.0129993Z",
+      "Kind": "ok",
+      "Title": "Unlocked",
+      "Detail": "By admin (admin); Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:07:04.0291946Z",
+      "Kind": "info",
+      "Title": "Session ended",
+      "Detail": "Ended by admin (admin)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": "10326"
+    },
+    {
+      "Time": "2026-11-25T13:07:08.7594491Z",
+      "Kind": "ok",
+      "Title": "Locked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:13.5911379Z",
+      "Kind": "warn",
+      "Title": "Arduino command not confirmed",
+      "Detail": "Arduino REJECTED: reason=ALARM_ACTIVE",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:17.2873756Z",
+      "Kind": "ok",
+      "Title": "Tamper alarm acknowledged",
+      "Detail": "By admin; Arduino confirmed; automatic 2-second rearm",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:19.2484194Z",
+      "Kind": "warn",
+      "Title": "Arduino command not confirmed",
+      "Detail": "Arduino REJECTED: reason=ALARM_RECOVERY",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:27.268139Z",
+      "Kind": "ok",
+      "Title": "Unlocked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:31.2449684Z",
+      "Kind": "ok",
+      "Title": "Locked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:38.6157503Z",
+      "Kind": "ok",
+      "Title": "Tamper alarm acknowledged",
+      "Detail": "By admin; Arduino confirmed; automatic 2-second rearm",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:44.5029857Z",
+      "Kind": "ok",
+      "Title": "Unlocked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:07:48.2888995Z",
+      "Kind": "ok",
+      "Title": "Locked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:08:00.3246405Z",
+      "Kind": "ok",
+      "Title": "Tamper alarm acknowledged",
+      "Detail": "By admin; Arduino confirmed; automatic 2-second rearm",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:08:02.1555549Z",
+      "Kind": "warn",
+      "Title": "Arduino command not confirmed",
+      "Detail": "Arduino REJECTED: reason=ALARM_RECOVERY",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    },
+    {
+      "Time": "2026-11-25T13:08:08.5584891Z",
+      "Kind": "ok",
+      "Title": "Unlocked",
+      "Detail": "Arduino command completed (position not verified)",
+      "DeviceId": "rack-a1",
+      "DeviceName": "Rack A1",
+      "SessionId": null
+    }
+  ],
+  "Admin": {
+    "Username": "admin",
+    "Salt": "apenOZEQT1ou9TdPK5oOmQ==",
+    "Hash": "Wb0md9XNn2eVzRSkv\u002BJAqIHpn4iTK3TZDtxrgqU08Ko="
+  }
+}
