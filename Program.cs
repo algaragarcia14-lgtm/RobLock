@@ -1,3 +1,5 @@
+using System.Net.Http.Json;
+using System.Text;
 using System.IO.Ports;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -18,6 +20,13 @@ using NpgsqlTypes;
 //  - data lives in the private roblock PostgreSQL schema
 //  The front end is plain HTML in wwwroot/ and Private/.
 // ---------------------------------------------------------------
+
+// Local bridge mode runs without starting the website or connecting to Supabase.
+if (args.Contains("--arduino-bridge", StringComparer.Ordinal))
+{
+    await LocalArduinoBridge.RunAsync();
+    return;
+}
 
 // Offline synthetic transition checks (no Supabase connection or serial access).
 if (args.Contains("--check-security-events", StringComparer.Ordinal))
@@ -132,6 +141,7 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<Db>();
 builder.Services.AddSingleton<ArduinoSerial>();
+builder.Services.AddSingleton<ArduinoBridgeQueue>();
 builder.Services.AddSingleton<Limiter>();
 builder.Services.AddHostedService<SecurityEventMonitor>();
 
@@ -196,6 +206,15 @@ app.MapGet("/dashboard", (HttpContext ctx, IWebHostEnvironment env) =>
 app.MapGet("/admin", () => Results.Redirect("/admin.html"));
 
 var api = app.MapGroup("/api");
+
+// Dedicated device transport: no public enqueue endpoint. Existing authenticated
+// dashboard/session handlers remain the only source of hardware commands.
+api.MapPost("/bridge/poll", (HttpContext ctx, ArduinoBridgeQueue queue) =>
+    !queue.Authorize(ctx) ? Results.StatusCode(401) : Results.Ok(queue.Poll()));
+api.MapPost("/bridge/result", (HttpContext ctx, BridgeReply reply, ArduinoBridgeQueue queue) =>
+    !queue.Authorize(ctx) ? Results.StatusCode(401) :
+    queue.Complete(reply) ? Results.Ok() : Results.StatusCode(409));
+
 
 // ---- admin account: setup, login, logout ----
 
@@ -1247,7 +1266,8 @@ sealed class SecurityEventMonitor : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ROBLOCK_ARDUINO_DEVICE_ID")) ||
-            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ROBLOCK_SERIAL_PORT"))) return;
+            (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ROBLOCK_SERIAL_PORT")) &&
+             !ArduinoBridgeQueue.CloudEnabled)) return;
         // Yield before doing synchronous DB/serial work so application startup is not blocked.
         await Task.Yield();
         while (!stoppingToken.IsCancellationRequested)
@@ -1421,6 +1441,8 @@ sealed class ArduinoSerial : IDisposable
     private readonly object _gate = new();
     private readonly string? _deviceId = Environment.GetEnvironmentVariable("ROBLOCK_ARDUINO_DEVICE_ID");
     private readonly string? _portName = Environment.GetEnvironmentVariable("ROBLOCK_SERIAL_PORT");
+    private readonly ArduinoBridgeQueue? _bridge;
+    public ArduinoSerial(ArduinoBridgeQueue? bridge = null) { _bridge = bridge; }
     private SerialPort? _port;
     private long _nextId;
 
@@ -1430,6 +1452,8 @@ sealed class ArduinoSerial : IDisposable
     {
         lock (_gate)
         {
+            if (_bridge is not null && ArduinoBridgeQueue.CloudEnabled)
+                return _bridge.Send(command, arguments);
             if (string.IsNullOrWhiteSpace(_portName))
                 return new(false, "ROBLOCK_SERIAL_PORT is not configured.", 503);
             try
@@ -1498,4 +1522,130 @@ sealed class ArduinoSerial : IDisposable
 
     private void Disconnect() { try { _port?.Dispose(); } catch { } _port = null; }
     public void Dispose() { lock (_gate) Disconnect(); }
+}
+
+
+record BridgeCommand(string Id, string Command, string? Arguments);
+record BridgePoll(BridgeCommand? Work);
+record BridgeReply(string Id, ArduinoResult Result);
+
+sealed class ArduinoBridgeQueue
+{
+    public static bool CloudEnabled => Environment.GetEnvironmentVariable("ROBLOCK_BRIDGE_MODE") == "cloud";
+    private readonly string? _token = Environment.GetEnvironmentVariable("ROBLOCK_BRIDGE_TOKEN");
+    private readonly object _gate = new();
+    private BridgeCommand? _pending;
+    private TaskCompletionSource<ArduinoResult>? _completion;
+    private bool _claimed;
+    private DateTime _lastPoll = DateTime.MinValue;
+
+    public bool Authorize(HttpContext ctx)
+    {
+        if (!CloudEnabled || string.IsNullOrWhiteSpace(_token) || _token.Length < 32) return false;
+        var supplied = ctx.Request.Headers.Authorization.ToString();
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes("Bearer " + _token));
+    }
+
+    public BridgePoll Poll()
+    {
+        lock (_gate)
+        {
+            _lastPoll = DateTime.UtcNow;
+            if (_pending is null || _claimed) return new(null);
+            _claimed = true; // Never deliver the same operation twice.
+            return new(_pending);
+        }
+    }
+
+    public bool Complete(BridgeReply reply)
+    {
+        lock (_gate)
+        {
+            if (!_claimed || _pending?.Id != reply.Id || reply.Result is null || _completion is null) return false;
+            return _completion.TrySetResult(reply.Result);
+        }
+    }
+
+    public ArduinoResult Send(string command, string? arguments)
+    {
+        TaskCompletionSource<ArduinoResult> completion;
+        lock (_gate)
+        {
+            if (string.IsNullOrWhiteSpace(_token) || _token.Length < 32)
+                return new(false, "ROBLOCK_BRIDGE_TOKEN is missing or too short.", 503);
+            if (DateTime.UtcNow - _lastPoll > TimeSpan.FromSeconds(8))
+                return new(false, "Local Arduino bridge is offline.", 503);
+            if (_pending is not null) return new(false, "Arduino bridge is busy.", 503);
+            _pending = new(Guid.NewGuid().ToString("N"), command, arguments);
+            _claimed = false;
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _completion = completion;
+        }
+        try
+        {
+            if (completion.Task.Wait(TimeSpan.FromSeconds(command == "LOCK" ? 35 : 18)))
+                return completion.Task.GetAwaiter().GetResult();
+            return new(false, "Bridge response timeout; commanded state is unconfirmed.", 504);
+        }
+        finally
+        {
+            lock (_gate) { _pending = null; _completion = null; _claimed = false; }
+        }
+    }
+}
+
+static class LocalArduinoBridge
+{
+    public static async Task RunAsync()
+    {
+        var url = Environment.GetEnvironmentVariable("ROBLOCK_BRIDGE_URL");
+        var token = Environment.GetEnvironmentVariable("ROBLOCK_BRIDGE_TOKEN");
+        var port = Environment.GetEnvironmentVariable("ROBLOCK_SERIAL_PORT");
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
+            string.IsNullOrWhiteSpace(token) || token.Length < 32 || string.IsNullOrWhiteSpace(port))
+        {
+            Console.Error.WriteLine("Set ROBLOCK_BRIDGE_URL (HTTPS), ROBLOCK_BRIDGE_TOKEN (32+ characters), and ROBLOCK_SERIAL_PORT.");
+            Environment.ExitCode = 1;
+            return;
+        }
+        using var stop = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+        using var serial = new ArduinoSerial(); // Local USB transport only.
+        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+        {
+            BaseAddress = new Uri(uri.AbsoluteUri.TrimEnd('/') + "/"),
+            Timeout = TimeSpan.FromSeconds(12)
+        };
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        Console.WriteLine("RobLock bridge started on " + port + ". Keep this window open. Ctrl+C stops it.");
+        bool online = false;
+        while (!stop.IsCancellationRequested)
+        {
+            try
+            {
+                using var response = await http.PostAsync("api/bridge/poll", null, stop.Token);
+                response.EnsureSuccessStatusCode();
+                var poll = await response.Content.ReadFromJsonAsync<BridgePoll>(cancellationToken: stop.Token);
+                if (!online) { Console.WriteLine("Connected to Render bridge endpoint."); online = true; }
+                if (poll?.Work is BridgeCommand work)
+                {
+                    // Execute at most once. A lost response never triggers a hardware retry.
+                    var result = serial.Send(work.Command, work.Arguments);
+                    using var sent = await http.PostAsJsonAsync("api/bridge/result", new BridgeReply(work.Id, result), stop.Token);
+                    if (!sent.IsSuccessStatusCode) Console.WriteLine("Result not accepted; device state may be unconfirmed.");
+                    else if (!result.Ok) Console.WriteLine("Arduino: " + result.Error);
+                }
+                await Task.Delay(500, stop.Token);
+            }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested) { break; }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+            {
+                if (online) online = false;
+                Console.WriteLine("Bridge connection error: " + ex.GetType().Name + (ex is HttpRequestException h ? " " + h.StatusCode : ""));
+                try { await Task.Delay(3000, stop.Token); }
+                catch (OperationCanceledException) { break; }
+            }
+        }
+    }
 }
