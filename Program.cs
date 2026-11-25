@@ -152,13 +152,26 @@ try
 {
     app.Services.GetRequiredService<Db>().ValidateStartup();
 }
-catch (Exception ex)
+catch (PostgresException ex)
 {
-    Console.Error.WriteLine("FAIL: Supabase startup validation failed (" + ex.GetType().Name + "). Run --check-supabase for diagnostics. No JSON fallback.");
+    Console.Error.WriteLine("SUPABASE DATABASE ERROR");
+    Console.Error.WriteLine($"SQLSTATE: {ex.SqlState}");
+    Console.Error.WriteLine($"MESSAGE: {ex.MessageText}");
+    Console.Error.WriteLine($"TABLE: {ex.TableName}");
+    Console.Error.WriteLine($"COLUMN: {ex.ColumnName}");
+    Console.Error.WriteLine($"CONSTRAINT: {ex.ConstraintName}");
+ 
     Environment.ExitCode = 1;
     return;
 }
-
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"SUPABASE ERROR: {ex.GetType().Name}");
+    Console.Error.WriteLine(ex.Message);
+ 
+    Environment.ExitCode = 1;
+    return;
+}
 app.Use(async (ctx, next) =>
 {
     try { await next(); }
